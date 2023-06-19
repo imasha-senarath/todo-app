@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:todo_app/screens/taskpage.dart';
 import 'package:todo_app/widgets.dart';
 
+import '../database_helper.dart';
+import '../models/task.dart';
+
 class Homepage extends StatefulWidget {
   const Homepage({Key? key}) : super(key: key);
 
@@ -10,6 +13,30 @@ class Homepage extends StatefulWidget {
 }
 
 class _HomepageState extends State<Homepage> {
+  final DatabaseHelper _databaseHelper = DatabaseHelper();
+  List<Task> _tasks = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTasks();
+  }
+
+  void _addDataManually() {
+    _tasks = [
+      const Task(id: 4, title: 'Task 4', description: 'Task 4'),
+      const Task(id: 5, title: 'Task 5', description: 'Task 4'),
+      const Task(id: 6, title: 'Task 6', description: 'Task 4'),
+    ];
+  }
+
+  Future<void> _loadTasks() async {
+    final tasks = await _databaseHelper.getTasks();
+    setState(() {
+      _tasks = tasks;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -36,34 +63,14 @@ class _HomepageState extends State<Homepage> {
                     ),
                   ),
                   Expanded(
-                    child: ListView(
-                      children: const [
-                        TaskCardWidget(
-                          title: "Get Started!",
-                          desc:
-                              'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam porta neque justo, sit amet iaculis diam cursus gravida. Phasellus elit ante, congue a diam et, sollicitudin feugiat tortor.',
-                        ),
-                        TaskCardWidget(
-                          title: "Unnamed Task",
-                          desc: 'No description',
-                        ),
-                        TaskCardWidget(
-                          title: "Unnamed Task",
-                          desc: 'No description',
-                        ),
-                        TaskCardWidget(
-                          title: "Unnamed Task",
-                          desc: 'No description',
-                        ),
-                        TaskCardWidget(
-                          title: "Unnamed Task",
-                          desc: 'No description',
-                        ),
-                        TaskCardWidget(
-                          title: "Unnamed Task",
-                          desc: 'No description',
-                        ),
-                      ],
+                    child: ListView.builder(
+                      itemCount: _tasks.length,
+                      itemBuilder: (context, index) {
+                        final task = _tasks[index];
+                        return TaskCardWidget(
+                          title: task.title,
+                        );
+                      },
                     ),
                   )
                 ],
@@ -75,16 +82,21 @@ class _HomepageState extends State<Homepage> {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (context) => TaskPage()
-                      ),
-                    );
+                      MaterialPageRoute(builder: (context) => const TaskPage()),
+                    ).then((value) => {
+                          setState(() {
+                            _loadTasks();
+                          })
+                        });
                   },
                   child: Container(
                     width: 60.0,
                     height: 60.0,
                     decoration: BoxDecoration(
-                        color: const Color(0xFF7349FE),
+                        gradient: const LinearGradient(
+                            colors: [Color(0xFF7349FE), Color(0xFF7557DE)],
+                            begin: Alignment(0.0, -1.0),
+                            end: Alignment(0.0, 1.0)),
                         borderRadius: BorderRadius.circular(60.0)),
                     child: const Image(
                       image: AssetImage("assets/images/add_icon.png"),
