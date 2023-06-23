@@ -67,8 +67,19 @@ class _HomepageState extends State<Homepage> {
                       itemCount: _tasks.length,
                       itemBuilder: (context, index) {
                         final task = _tasks[index];
-                        return TaskCardWidget(
-                          title: task.title,
+                        return GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => TaskPage(
+                                    task: task,
+                                  ),
+                                ));
+                          },
+                          child: TaskCardWidget(
+                            title: task.title,
+                          ),
                         );
                       },
                     ),
@@ -82,7 +93,10 @@ class _HomepageState extends State<Homepage> {
                   onTap: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const TaskPage()),
+                      MaterialPageRoute(
+                          builder: (context) => const TaskPage(
+                                task: null,
+                              )),
                     ).then((value) => {
                           setState(() {
                             _loadTasks();
