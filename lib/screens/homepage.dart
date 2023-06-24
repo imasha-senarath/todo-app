@@ -75,10 +75,15 @@ class _HomepageState extends State<Homepage> {
                                   builder: (context) => TaskPage(
                                     task: task,
                                   ),
-                                ));
+                                )).then((value) {
+                                  setState(() {
+                                    _loadTasks();
+                                  });
+                            });
                           },
                           child: TaskCardWidget(
                             title: task.title,
+                            desc: task.description,
                           ),
                         );
                       },

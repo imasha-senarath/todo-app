@@ -17,30 +17,46 @@ class TaskPage extends StatefulWidget {
 }
 
 class _TaskPageState extends State<TaskPage> {
-
   final DatabaseHelper _databaseHelper = DatabaseHelper();
   List<Todo> _todo = [];
 
+  int? _taskId = 0;
   String? _taskTitle = "";
+  String? _taskDescription = "";
+
+  late FocusNode _titleFocus;
+  late FocusNode _descriptionFocus;
+  late FocusNode _todoFocus;
+
+  bool _contentVisible = false;
 
   @override
   void initState() {
     if (widget.task != null) {
+      _contentVisible = true;
       _taskTitle = widget.task?.title;
+      _taskId = widget.task?.id;
+      _taskDescription = widget.task?.description;
       _loadTodo();
     }
-    Fluttertoast.showToast(
-      msg: (widget.task?.id).toString(),
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.BOTTOM,
-      backgroundColor: Colors.black,
-      textColor: Colors.white,
-    );
+
+    _titleFocus = FocusNode();
+    _descriptionFocus = FocusNode();
+    _todoFocus = FocusNode();
+
     super.initState();
   }
 
+  @override
+  void dispose() {
+    _titleFocus.dispose();
+    _descriptionFocus.dispose();
+    _todoFocus.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadTodo() async {
-    final todo = await _databaseHelper.getTodo();
+    final todo = await _databaseHelper.getTodo(_taskId);
     setState(() {
       _todo = todo;
     });
@@ -78,10 +94,10 @@ class _TaskPageState extends State<TaskPage> {
                       ),
                       Expanded(
                         child: TextField(
+                          focusNode: _titleFocus,
                           onSubmitted: (value) async {
                             if (value != "") {
                               if (widget.task == null) {
-                                DatabaseHelper dbHelper = DatabaseHelper();
 
                                 Task newTask = Task(
                                   title: value,
@@ -89,20 +105,25 @@ class _TaskPageState extends State<TaskPage> {
                                 );
 
                                 try {
-                                  await dbHelper.insertTask(newTask);
+                                  _taskId = await _databaseHelper.insertTask(newTask);
+
+                                  _descriptionFocus.requestFocus();
+                                  setState(() {
+                                    _contentVisible = true;
+                                    _taskTitle = value;
+                                  });
+                                } catch (e) {
                                   Fluttertoast.showToast(
-                                    msg: 'Task added successfully',
+                                    msg: e.toString(),
                                     toastLength: Toast.LENGTH_SHORT,
                                     gravity: ToastGravity.BOTTOM,
                                     backgroundColor: Colors.black,
                                     textColor: Colors.white,
                                   );
-                                } catch (e) {
-                                  if (kDebugMode) {
-                                    print('[test66] $e');
-                                  }
                                 }
-                              } else {}
+                              } else {
+                                _databaseHelper.updateTaskTitle(_taskId!, value);
+                              }
                             }
                           },
                           controller: TextEditingController()
@@ -121,82 +142,109 @@ class _TaskPageState extends State<TaskPage> {
                     ],
                   ),
                 ),
-                const Padding(
-                  padding: EdgeInsets.only(
-                    bottom: 12.0,
-                  ),
-                  child: TextField(
-                    decoration: InputDecoration(
-                        hintText: "Enter description for the task",
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 24.0,
-                        )),
-                  ),
-                ),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: _todo.length,
-                    itemBuilder: (context, index) {
-                      final todo = _todo[index];
-                      return const TodoWidget(
-
-                      );
-                    },
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: Row(children: [
-                    Container(
-                      width: 20.0,
-                      height: 20.0,
-                      margin: const EdgeInsets.only(
-                        right: 15.0,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.transparent,
-                        borderRadius: BorderRadius.circular(6.0),
-                        border: Border.all(
-                          color: const Color(0xFF868290),
-                          width: 1.5,
-                        ),
-                      ),
-                      child: const Padding(
-                        padding: EdgeInsets.all(4.0),
-                        child: Image(
-                          image: AssetImage(
-                            'assets/images/check_icon.png',
-                          ),
-                          color: Color(0xFFFFFFFF),
-                        ),
-                      ),
+                Visibility(
+                  visible: _contentVisible,
+                  child: Padding(
+                    padding: const EdgeInsets.only(
+                      bottom: 12.0,
                     ),
-                    Expanded(
-                      child: TextField(
-                        onSubmitted: (value) async {
-                          if (value != "") {
-                            if (widget.task != null) {
-                              DatabaseHelper dbHelper = DatabaseHelper();
+                    child: TextField(
+                      focusNode: _descriptionFocus,
+                      onSubmitted: (value) async {
+                        if(value != "") {
+                          if(_taskId != 0) {
+                            await _databaseHelper.updateTaskDescription(_taskId!, value);
+                            _taskDescription = value;
+                          }
+                        }
+                        _todoFocus.requestFocus();
 
-                              Todo newTodo = Todo(
-                                taskId: widget.task?.id,
-                                title: value,
-                                isDone: 0,
-                              );
+                      },
+                      controller: TextEditingController()
+                        ..text = _taskDescription!,
+                      decoration: const InputDecoration(
+                          hintText: "Enter description for the task",
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 24.0,
+                          )),
+                    ),
+                  ),
+                ),
+                Visibility(
+                  visible: _contentVisible,
+                  child: Expanded(
+                    child: ListView.builder(
+                      itemCount: _todo.length,
+                      itemBuilder: (context, index) {
+                        final todo = _todo[index];
+                        return GestureDetector(
+                          onTap: () async {
+                            if(todo.isDone == 0) {
+                              await _databaseHelper.updateTodoDone(todo.id, 1);
+                            } else {
+                              await _databaseHelper.updateTodoDone(todo.id, 0);
+                            }
+                            _loadTodo();
+                          },
+                          child: TodoWidget(
+                            text: todo.title,
+                            isDone: todo.isDone == 0 ? false : true,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                Visibility(
+                  visible: _contentVisible,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                    child: Row(children: [
+                      Container(
+                        width: 20.0,
+                        height: 20.0,
+                        margin: const EdgeInsets.only(
+                          right: 15.0,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(6.0),
+                          border: Border.all(
+                            color: const Color(0xFF868290),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4.0),
+                          child: Image(
+                            image: AssetImage(
+                              'assets/images/check_icon.png',
+                            ),
+                            color: Color(0xFFFFFFFF),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: TextField(
+                          focusNode: _todoFocus,
+                          controller: TextEditingController()..text = "",
+                          onSubmitted: (value) async {
+                            if (value != "") {
+                              if (_taskId != null) {
+                                DatabaseHelper dbHelper = DatabaseHelper();
 
-                              try {
-                                await dbHelper.insertTodo(newTodo);
-                                Fluttertoast.showToast(
-                                  msg: 'Task added successfully',
-                                  toastLength: Toast.LENGTH_SHORT,
-                                  gravity: ToastGravity.BOTTOM,
-                                  backgroundColor: Colors.black,
-                                  textColor: Colors.white,
+                                Todo newTodo = Todo(
+                                  taskId: _taskId,
+                                  title: value,
+                                  isDone: 0,
                                 );
-                              } catch (e) {
-                                if (kDebugMode) {
-                                  print('[test66] $e');
+
+                                try {
+                                  await dbHelper.insertTodo(newTodo);
+                                  _loadTodo();
+                                  _todoFocus.requestFocus();
+                                } catch (e) {
                                   Fluttertoast.showToast(
                                     msg: e.toString(),
                                     toastLength: Toast.LENGTH_SHORT,
@@ -207,45 +255,62 @@ class _TaskPageState extends State<TaskPage> {
                                 }
                               }
                             }
-                          }
-                        },
-                        decoration: const InputDecoration(
-                            hintText: 'Enter todo item...',
-                            border: InputBorder.none),
-                      ),
-                    )
-                  ]),
+                          },
+                          decoration: const InputDecoration(
+                              hintText: 'Enter todo item...',
+                              border: InputBorder.none),
+                        ),
+                      )
+                    ]),
+                  ),
                 )
               ],
             ),
-            Positioned(
-              bottom: 24.0,
-              right: 24.0,
-              child: GestureDetector(
-                onTap: () {
-                  Fluttertoast.showToast(
-                    msg: "(widget.id).toString()",
-                    toastLength: Toast.LENGTH_SHORT,
-                    gravity: ToastGravity.BOTTOM,
-                    backgroundColor: Colors.black,
-                    textColor: Colors.white,
-                  );
-                  /*         Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const TaskPage()),
-                  );*/
-                },
-                child: Container(
-                  width: 60.0,
-                  height: 60.0,
-                  decoration: BoxDecoration(
-                      color: const Color(0xFFFE3577),
-                      borderRadius: BorderRadius.circular(60.0)),
-                  child: const Padding(
-                    padding: EdgeInsets.all(20.0),
-                    child: Image(
-                      image: AssetImage("assets/images/delete_icon.png"),
-                      color: Color(0xFFFFFFFF),
+            Visibility(
+              visible: _contentVisible,
+              child: Positioned(
+                bottom: 24.0,
+                right: 24.0,
+                child: GestureDetector(
+                  onTap: () async {
+                    if(_taskId != 0) {
+                      try {
+                        await _databaseHelper.deleteTask(_taskId);
+                        Fluttertoast.showToast(
+                          msg: 'Task deleted.',
+                          toastLength: Toast.LENGTH_SHORT,
+                          gravity: ToastGravity.BOTTOM,
+                          backgroundColor: Colors.black,
+                          textColor: Colors.white,
+                        );
+                        Navigator.pop(context);
+                      } catch (e) {
+                        if (kDebugMode) {
+                          Fluttertoast.showToast(
+                            msg: e.toString(),
+                            toastLength: Toast.LENGTH_SHORT,
+                            gravity: ToastGravity.BOTTOM,
+                            backgroundColor: Colors.black,
+                            textColor: Colors.white,
+                          );
+                        }
+                      }
+
+
+                    }
+                  },
+                  child: Container(
+                    width: 60.0,
+                    height: 60.0,
+                    decoration: BoxDecoration(
+                        color: const Color(0xFFFE3577),
+                        borderRadius: BorderRadius.circular(60.0)),
+                    child: const Padding(
+                      padding: EdgeInsets.all(20.0),
+                      child: Image(
+                        image: AssetImage("assets/images/delete_icon.png"),
+                        color: Color(0xFFFFFFFF),
+                      ),
                     ),
                   ),
                 ),
